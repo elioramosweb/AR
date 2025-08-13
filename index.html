@@ -29,9 +29,10 @@
     arjs="sourceType: webcam; trackingMethod: best; debugUIEnabled: false;">
 
     <!-- Plano anclado al marcador donde mapearemos el canvas de p5 -->
-    <a-marker preset="hiro">
+    <a-marker type="pattern" url="https://raw.githubusercontent.com/jeromeetienne/AR.js/master/three.js/examples/marker-training/examples/pattern-files/pattern-hiro.patt">
       <a-plane id="p5plane" position="0 0 0" rotation="-90 0 0" width="1" height="1" material="transparent: true"></a-plane>
     </a-marker>
+
 
     <!-- Cámara de A-Frame (necesaria) -->
     <a-entity camera></a-entity>
