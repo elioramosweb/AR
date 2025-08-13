@@ -3,17 +3,28 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>AR.js + p5.js sobre marcador (Hiro)</title>
+  <title>AR.js + p5.js — Test marcador Hiro</title>
   <!-- A-Frame -->
   <script src="https://unpkg.com/aframe@1.5.0/dist/aframe.min.js"></script>
-  <!-- AR.js para A-Frame (marker-based) -->
+  <!-- AR.js para A-Frame -->
   <script src="https://cdn.jsdelivr.net/npm/ar.js@3.4.5/aframe/build/aframe-ar.js"></script>
   <!-- p5.js -->
   <script src="https://cdn.jsdelivr.net/npm/p5@1.9.3/lib/p5.min.js"></script>
   <style>
     body { margin: 0; overflow: hidden; font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; }
-    .hud { position: fixed; top: 0; left: 0; right: 0; background: rgba(0,0,0,.55); color: #fff; padding: .5rem .75rem; font-size: .9rem; z-index: 10; }
+    .hud {
+      position: fixed; top: 0; left: 0; right: 0; z-index: 10;
+      background: rgba(0,0,0,.55); color: #fff; padding: .5rem .75rem; font-size: .9rem;
+    }
     .hud a { color: #9ad; }
+    .status {
+      position: fixed; right: 8px; bottom: 8px; z-index: 10;
+      background: rgba(0,0,0,.55); color:#fff; padding:.4rem .6rem; border-radius: .4rem; font-size: .85rem;
+    }
+    #testCam {
+      position: fixed; left:8px; bottom:8px; z-index: 10;
+      padding: .4rem .6rem;
+    }
   </style>
 </head>
 <body>
@@ -21,44 +32,73 @@
     Apunta la cámara al
     <a href="https://raw.githubusercontent.com/AR-js-org/AR.js/master/data/images/HIRO.jpg" target="_blank" rel="noopener">
       marcador Hiro
-    </a>
-    e intenta estabilizar la imagen. Si no ves la animación, da permiso a la cámara y asegúrate de usar <strong>https</strong> o un servidor local.
+    </a>.
+    Si no ves nada: usa <b>HTTPS</b>, buena luz, y llena 30–60% del encuadre con el marcador (mejor impreso).
   </div>
+  <div class="status" id="status">Estado: esperando cámara…</div>
+  <button id="testCam">Activar cámara (test)</button>
 
-  <!-- Escena AR: usa la cámara del dispositivo -->
   <a-scene
     embedded
     vr-mode-ui="enabled: false"
     renderer="colorManagement: true; physicallyCorrectLights: true"
     arjs="sourceType: webcam; trackingMethod: best; facingMode: environment; debugUIEnabled: false;">
 
-    <!-- Marcador Hiro incorporado -->
-    <a-marker preset="hiro">
-      <!-- Plano donde mapeamos el canvas de p5 -->
-      <a-plane id="p5plane" position="0 0 0" rotation="-90 0 0" width="1" height="1"
-               material="transparent: true"></a-plane>
+    <!-- Marcador Hiro -->
+    <a-marker preset="hiro" id="marker">
+      <!-- CUBO DE PRUEBA: debe aparecer en cuanto el marcador se detecte -->
+      <a-box position="0 0.5 0" depth="1" height="1" width="1" color="#00c37a" material="opacity:0.85"></a-box>
+
+      <!-- PLANO para la textura p5 (más grande, doble cara) -->
+      <a-plane id="p5plane"
+               position="0 0 0"
+               rotation="-90 0 0"
+               width="1.5" height="1.5"
+               material="transparent: true; side: double">
+      </a-plane>
     </a-marker>
 
-    <!-- Cámara de A-Frame (necesaria) -->
     <a-entity camera></a-entity>
   </a-scene>
 
   <script>
-    // === p5.js: animación 2D que se usará como textura dinámica ===
-    let cnv, t = 0;
+    // --- Botón de diagnóstico: solicita permiso explícito a la cámara ---
+    document.getElementById('testCam').addEventListener('click', async () => {
+      const status = document.getElementById('status');
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
+        stream.getTracks().forEach(t => t.stop());
+        status.textContent = 'Estado: ✅ Cámara OK (permiso concedido).';
+      } catch (e) {
+        status.textContent = 'Estado: ❌ ' + e.name + ' — ' + e.message;
+      }
+    });
 
+    // --- Estado de marcador: muestra si se detecta o no ---
+    const status = document.getElementById('status');
+    const marker = document.getElementById('marker');
+    marker.addEventListener('markerFound', () => {
+      status.textContent = 'Estado: ✅ Marcador detectado.';
+    });
+    marker.addEventListener('markerLost', () => {
+      status.textContent = 'Estado: ⏳ Buscando marcador…';
+    });
+  </script>
+
+  <script>
+    // === p5.js: animación 2D para textura dinámica ===
+    let cnv, t = 0;
     function setup() {
-      // Creamos un canvas cuadrado (512x512) y le ponemos id conocido
       cnv = createCanvas(512, 512);
       cnv.id('p5canvas');
-      pixelDensity(1); // más estable como textura
+      pixelDensity(1);
       noStroke();
 
-      // Cuando A-Frame haya inicializado, asignamos el canvas como textura
       const plane = document.getElementById('p5plane');
       const tryAttach = () => {
         if (plane && document.getElementById('p5canvas')) {
-          plane.setAttribute('material', 'src: #p5canvas; transparent: true');
+          // Asignamos el canvas como textura y lo dejamos doble cara
+          plane.setAttribute('material', 'src: #p5canvas; transparent: true; side: double');
         } else {
           setTimeout(tryAttach, 100);
         }
@@ -67,14 +107,13 @@
     }
 
     function draw() {
-      // Fondo con gradiente animado sencillo
+      // Fondo con gradiente animado
       for (let y = 0; y < height; y++) {
         const c = map(y, 0, height, 20, 40) + 20 * sin(t + y * 0.01);
         fill(10, c, 180);
         rect(0, y, width, 1);
       }
-
-      // Figura "anillo" pulsante
+      // Figura pulsante
       translate(width/2, height/2);
       const R = 160 + 40 * sin(t * 1.2);
       const r = 90 + 30 * cos(t * 1.6);
@@ -89,7 +128,7 @@
       }
       endShape(CLOSE);
 
-      // Texto sutil
+      // Texto
       resetMatrix();
       fill(255, 240);
       textAlign(CENTER, CENTER);
