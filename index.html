@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>AR.js + p5.js sobre marcador (Hiro)</title>
+  <!-- A-Frame -->
+  <script src="https://unpkg.com/aframe@1.5.0/dist/aframe.min.js"></script>
+  <!-- AR.js para A-Frame (marker-based) -->
+  <script src="https://cdn.jsdelivr.net/npm/ar.js@3.4.5/aframe/build/aframe-ar.js"></script>
+  <!-- p5.js -->
+  <script src="https://cdn.jsdelivr.net/npm/p5@1.9.3/lib/p5.min.js"></script>
+  <style>
+    body { margin: 0; overflow: hidden; font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; }
+    .hud { position: fixed; top: 0; left: 0; right: 0; background: rgba(0,0,0,.55); color: #fff; padding: .5rem .75rem; font-size: .9rem; z-index: 10; }
+    .hud a { color: #9ad; }
+  </style>
+</head>
+<body>
+  <div class="hud">
+    Apunta la cámara al <a href="https://raw.githubusercontent.com/AR-js-org/AR.js/master/three.js/data/HIRO.jpg" target="_blank" rel="noopener">marcador Hiro</a> e intenta estabilizar la imagen. Si no ves la animación, da permiso a la cámara y asegúrate de usar <strong>https</strong> o un servidor local.
+  </div>
+
+  <!-- Escena AR: usa la cámara del dispositivo -->
+  <a-scene
+    embedded
+    vr-mode-ui="enabled: false"
+    renderer="colorManagement: true; physicallyCorrectLights: true"
+    arjs="sourceType: webcam; trackingMethod: best; debugUIEnabled: false;">
+
+    <!-- Plano anclado al marcador donde mapearemos el canvas de p5 -->
+    <a-marker type="pattern" url="https://raw.githubusercontent.com/AR-js-org/AR.js/master/three.js/data/patt.hiro">
+      <!-- El canvas de p5 se asigna por JS al cargar -->
+      <a-plane id="p5plane" position="0 0 0" rotation="-90 0 0" width="1" height="1" material="transparent: true"></a-plane>
+    </a-marker>
+
+    <!-- Cámara de A-Frame (necesaria) -->
+    <a-entity camera></a-entity>
+  </a-scene>
+
+  <script>
+    // === p5.js: animación 2D que se usará como textura dinámica ===
+    let cnv, t = 0;
+
+    function setup() {
+      // Creamos un canvas cuadrado (512x512) y le ponemos id conocido
+      cnv = createCanvas(512, 512);
+      cnv.id('p5canvas');
+      pixelDensity(1); // más estable como textura
+      noStroke();
+
+      // Cuando A-Frame haya inicializado, asignamos el canvas como textura
+      const plane = document.getElementById('p5plane');
+      const tryAttach = () => {
+        if (plane && document.getElementById('p5canvas')) {
+          plane.setAttribute('material', 'src: #p5canvas; transparent: true');
+        } else {
+          setTimeout(tryAttach, 100);
+        }
+      };
+      tryAttach();
+    }
+
+    function draw() {
+      // Fondo con gradiente animado sencillo
+      for (let y = 0; y < height; y++) {
+        const c = map(y, 0, height, 20, 40) + 20 * sin(t + y * 0.01);
+        fill(10, c, 180);
+        rect(0, y, width, 1);
+      }
+
+      // Figura "anillo" pulsante
+      translate(width/2, height/2);
+      const R = 160 + 40 * sin(t * 1.2);
+      const r = 90 + 30 * cos(t * 1.6);
+      const pts = 180;
+      fill(255, 255, 255, 220);
+      beginShape();
+      for (let i = 0; i < pts; i++) {
+        const a = TWO_PI * i / pts;
+        const x = (R + r * cos(4*a + t)) * cos(a);
+        const y = (R + r * cos(4*a + t)) * sin(a);
+        vertex(x, y);
+      }
+      endShape(CLOSE);
+
+      // Texto sutil
+      resetMatrix();
+      fill(255, 240);
+      textAlign(CENTER, CENTER);
+      textSize(18);
+      text('p5.js → textura AR', width/2, height-24);
+
+      t += 0.02;
+    }
+  </script>
+</body>
+</html>
