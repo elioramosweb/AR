@@ -18,7 +18,11 @@
 </head>
 <body>
   <div class="hud">
-    Apunta la cámara al <a href="https://raw.githubusercontent.com/AR-js-org/AR.js/master/data/images/HIRO.jpg" target="_blank" rel="noopener">marcador Hiro</a> e intenta estabilizar la imagen. Si no ves la animación, da permiso a la cámara y asegúrate de usar <strong>https</strong> o un servidor local.
+    Apunta la cámara al
+    <a href="https://raw.githubusercontent.com/AR-js-org/AR.js/master/data/images/HIRO.jpg" target="_blank" rel="noopener">
+      marcador Hiro
+    </a>
+    e intenta estabilizar la imagen. Si no ves la animación, da permiso a la cámara y asegúrate de usar <strong>https</strong> o un servidor local.
   </div>
 
   <!-- Escena AR: usa la cámara del dispositivo -->
@@ -26,13 +30,14 @@
     embedded
     vr-mode-ui="enabled: false"
     renderer="colorManagement: true; physicallyCorrectLights: true"
-    arjs="sourceType: webcam; trackingMethod: best; debugUIEnabled: false;">
+    arjs="sourceType: webcam; trackingMethod: best; facingMode: environment; debugUIEnabled: false;">
 
-    <!-- Plano anclado al marcador donde mapearemos el canvas de p5 -->
-    <a-marker type="pattern" url="https://raw.githubusercontent.com/jeromeetienne/AR.js/master/three.js/examples/marker-training/examples/pattern-files/pattern-hiro.patt">
-      <a-plane id="p5plane" position="0 0 0" rotation="-90 0 0" width="1" height="1" material="transparent: true"></a-plane>
+    <!-- Marcador Hiro incorporado -->
+    <a-marker preset="hiro">
+      <!-- Plano donde mapeamos el canvas de p5 -->
+      <a-plane id="p5plane" position="0 0 0" rotation="-90 0 0" width="1" height="1"
+               material="transparent: true"></a-plane>
     </a-marker>
-
 
     <!-- Cámara de A-Frame (necesaria) -->
     <a-entity camera></a-entity>
