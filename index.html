@@ -3,109 +3,56 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>AR.js + p5.js — Hiro (iOS)</title>
+  <title>AR.js + p5.js — start después del toque (iOS)</title>
 
-  <!-- Versiones compatibles -->
+  <!-- Versiones probadas -->
   <script src="https://unpkg.com/aframe@1.3.0/dist/aframe.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/ar.js@3.4.5/aframe/build/aframe-ar.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/p5@1.9.3/lib/p5.min.js"></script>
 
   <style>
-    body { margin:0; overflow:hidden; font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif }
-    .hud{position:fixed;left:0;right:0;top:0;padding:.6rem .8rem;background:rgba(0,0,0,.55);color:#fff;z-index:10;font-size:.9rem}
+    :root { color-scheme: dark light; }
+    html,body { margin:0; height:100%; overflow:hidden; font-family: system-ui,-apple-system,Segoe UI,Roboto,sans-serif; }
+    .hud{position:fixed;left:0;right:0;top:0;padding:.6rem .8rem;background:rgba(0,0,0,.55);color:#fff;z-index:9999;font-size:.9rem}
     .hud a{color:#9ad}
-    .status{position:fixed;right:8px;bottom:8px;padding:.45rem .65rem;border-radius:.45rem;background:rgba(0,0,0,.55);color:#fff;z-index:10;font-size:.85rem}
-    #startAR{position:fixed;left:8px;bottom:8px;padding:.5rem .8rem;border:0;border-radius:.5rem;background:#00c37a;color:#082;font-weight:700;z-index:10}
+    .status{position:fixed;right:8px;bottom:8px;padding:.45rem .65rem;border-radius:.45rem;background:rgba(0,0,0,.55);color:#fff;z-index:9999;font-size:.85rem}
+    #startAR{position:fixed;left:8px;bottom:8px;padding:.6rem 1rem;border:0;border-radius:.6rem;background:#00c37a;color:#062;font-weight:700;z-index:10000;cursor:pointer;pointer-events:auto}
+    #startAR[disabled]{opacity:.6;cursor:not-allowed}
+    /* Evita que algo tape el botón */
+    a-scene, .a-canvas, .a-grab-cursor, .a-grab-cursor * { touch-action: manipulation; }
   </style>
 </head>
 <body>
   <div class="hud">
-    Abre esto en <b>Safari (iPhone)</b>, toca <b>Iniciar AR</b> y apunta al
+    1) Toca <b>Iniciar AR</b> · 2) Acepta cámara · 3) Apunta al
     <a href="https://raw.githubusercontent.com/AR-js-org/AR.js/master/data/images/HIRO.jpg" target="_blank" rel="noopener">marcador Hiro</a>.
+    (Abre en <b>Safari</b>, no en navegadores dentro de apps.)
   </div>
-  <div class="status" id="status">Estado: esperando inicio…</div>
+  <div class="status" id="status">Estado: esperando toque…</div>
   <button id="startAR">Iniciar AR</button>
 
-  <a-scene id="scene" embedded renderer="alpha:true;antialias:true"
-           vr-mode-ui="enabled:false"
-           arjs="sourceType: webcam; facingMode: environment; debugUIEnabled: false;">
-    <a-marker id="marker" preset="hiro">
-      <!-- Cubo de verificación -->
-      <a-box position="0 0.5 0" depth="1" height="1" width="1"
-             color="#00c37a" material="opacity:0.85"></a-box>
-
-      <!-- Plano con textura p5 -->
-      <a-plane id="p5plane" position="0 0.01 0" rotation="-90 0 0"
-               width="1.5" height="1.5"
-               material="shader: flat; side: double; transparent: true; src: #p5canvas"
-               canvas-texture>
-      </a-plane>
-    </a-marker>
-    <a-entity camera></a-entity>
-  </a-scene>
-
+  <!-- p5: generamos el canvas desde ya -->
   <script>
-    // Asegurar playsinline/muted en el <video> de AR.js (iOS)
-    const mo = new MutationObserver(() => {
-      document.querySelectorAll('video').forEach(v => {
-        v.setAttribute('playsinline',''); v.playsInline = true; v.muted = true;
-      });
-    });
-    mo.observe(document.documentElement, { childList: true, subtree: true });
-
-    // Componente: refresca la textura de canvas cada frame
-    AFRAME.registerComponent('canvas-texture', {
-      tick(){
-        const mesh = this.el.getObject3D('mesh');
-        if (!mesh) return;
-        const mats = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
-        mats.forEach(m => { if (m.map) m.map.needsUpdate = true; });
-      }
-    });
-
-    // Gesto de usuario para permiso de cámara en iOS
-    const startBtn = document.getElementById('startAR');
-    const statusEl = document.getElementById('status');
-    startBtn.addEventListener('click', async () => {
-      try{
-        const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: "environment" } }, audio:false });
-        stream.getTracks().forEach(t => t.stop()); // AR.js abrirá su propio stream
-        statusEl.textContent = 'Estado: ✅ Permiso concedido. Apunta al marcador.';
-      }catch(e){
-        statusEl.textContent = 'Estado: ❌ ' + e.name + ' — ' + e.message;
-      }
-    });
-
-    // Mensajes de tracking
-    const marker = document.getElementById('marker');
-    marker.addEventListener('markerFound', () => statusEl.textContent = 'Estado: ✅ Marcador detectado.');
-    marker.addEventListener('markerLost',  () => statusEl.textContent = 'Estado: ⏳ Buscando marcador…');
-  </script>
-
-  <script>
-    // === p5.js (canvas como textura) ===
-    let cnv, t = 0;
+    let t = 0;
     function setup(){
-      cnv = createCanvas(512, 512);
+      const cnv = createCanvas(512,512);
       cnv.id('p5canvas');
       pixelDensity(1);
       noStroke();
     }
     function draw(){
-      // Fondo animado
       for (let y=0; y<height; y++){
-        const c = map(y,0,height,20,40) + 20 * Math.sin(t + y*0.01);
-        fill(10, c, 180); rect(0,y,width,1);
+        const c = map(y,0,height,20,40) + 20*Math.sin(t + y*0.01);
+        fill(10,c,180); rect(0,y,width,1);
       }
-      // Figura
       push();
       translate(width/2, height/2);
       const R = 160 + 40*Math.sin(t*1.2);
-      const r = 90  + 30*Math.cos(t*1.6);
+      const r =  90 + 30*Math.cos(t*1.6);
       const pts = 180;
       fill(255,255,255,220);
       beginShape();
-      for (let i=0; i<pts; i++){
+      for (let i=0;i<pts;i++){
         const a = TWO_PI*i/pts;
         const x = (R + r*Math.cos(4*a + t)) * Math.cos(a);
         const y = (R + r*Math.cos(4*a + t)) * Math.sin(a);
@@ -113,13 +60,132 @@
       }
       endShape(CLOSE);
       pop();
-
       fill(255,240); textAlign(CENTER,CENTER); textSize(18);
       text('p5.js → textura AR', width/2, height-24);
-
       t += 0.02;
     }
   </script>
+
+  <script>
+    const statusEl = document.getElementById('status');
+    const startBtn  = document.getElementById('startAR');
+
+    // Asegura que el toque se capture en iOS
+    ['click','touchend'].forEach(ev => {
+      startBtn.addEventListener(ev, startFlow, { passive: true });
+    });
+
+    async function startFlow(){
+      // evita dobles toques
+      startBtn.disabled = true;
+
+      // 1) Pedimos permiso a la cámara (gesto del usuario)
+      try {
+        statusEl.textContent = 'Estado: pidiendo permiso de cámara…';
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: { ideal: 'environment' } }, audio: false
+        });
+        // detenemos de inmediato; AR.js abrirá su propio stream
+        stream.getTracks().forEach(t => t.stop());
+      } catch (e) {
+        statusEl.textContent = 'Estado: ❌ ' + e.name + ' — ' + e.message;
+        startBtn.disabled = false;
+        return;
+      }
+
+      // 2) Inyectamos la escena AR SOLO después del permiso
+      statusEl.textContent = 'Estado: iniciando AR…';
+      injectARScene();
+
+      // 3) Por seguridad, marcamos videos como inline/muted en iOS
+      const mo = new MutationObserver(() => {
+        document.querySelectorAll('video').forEach(v => {
+          v.setAttribute('playsinline',''); v.playsInline = true; v.muted = true;
+        });
+      });
+      mo.observe(document.documentElement, { childList: true, subtree: true });
+
+      // 4) Ocultamos el botón para que no estorbe
+      startBtn.style.display = 'none';
+    }
+
+    function injectARScene(){
+      // Registramos el componente que refresca la textura del canvas
+      if (!AFRAME.components['canvas-texture']) {
+        AFRAME.registerComponent('canvas-texture', {
+          init(){
+            // ponemos el material plano (sin luces) y con el canvas como src
+            this.el.setAttribute('material', 'shader: flat; src: #p5canvas; side: double; transparent: true; color: #fff');
+          },
+          tick(){
+            const mesh = this.el.getObject3D('mesh');
+            if (!mesh) return;
+            const mats = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+            mats.forEach(m => { if (m.map) m.map.needsUpdate = true; });
+          }
+        });
+      }
+
+      // Creamos <a-scene> dinámicamente
+      const scene = document.createElement('a-scene');
+      scene.setAttribute('embedded', '');
+      scene.setAttribute('renderer', 'alpha: true; antialias: true');
+      scene.setAttribute('vr-mode-ui', 'enabled: false');
+      scene.setAttribute('arjs', 'sourceType: webcam; facingMode: environment; debugUIEnabled: false;');
+
+      // Marcador
+      const marker = document.createElement('a-marker');
+      marker.setAttribute('id', 'marker');
+      marker.setAttribute('preset', 'hiro');
+
+      // Cubo de control (para verificar tracking)
+      const box = document.createElement('a-box');
+      box.setAttribute('position', '0 0.5 0');
+      box.setAttribute('depth', '1');
+      box.setAttribute('height', '1');
+      box.setAttribute('width', '1');
+      box.setAttribute('color', '#00c37a');
+      box.setAttribute('material', 'opacity: 0.85');
+
+      // Plano con textura p5 (un pelín alto para evitar z-fighting)
+      const plane = document.createElement('a-plane');
+      plane.setAttribute('id', 'p5plane');
+      plane.setAttribute('position', '0 0.01 0');
+      plane.setAttribute('rotation', '-90 0 0');
+      plane.setAttribute('width', '1.5');
+      plane.setAttribute('height', '1.5');
+      plane.setAttribute('canvas-texture', ''); // nuestro componente
+
+      // Cámara
+      const cam = document.createElement('a-entity');
+      cam.setAttribute('camera', '');
+
+      // Ensamblamos
+      marker.appendChild(box);
+      marker.appendChild(plane);
+      scene.appendChild(marker);
+      scene.appendChild(cam);
+      document.body.appendChild(scene);
+
+      // Estado del tracking
+      marker.addEventListener('markerFound', () => statusEl.textContent = 'Estado: ✅ Marcador detectado.');
+      marker.addEventListener('markerLost',  () => statusEl.textContent = 'Estado: ⏳ Buscando marcador…');
+    }
+
+    // Diagnóstico rápido por si el botón sigue sin “responder”
+    (function diagnostics(){
+      const ua = navigator.userAgent || '';
+      const inAppBrowser = /FBAN|FBAV|Instagram|Line|Twitter|FB_IAB/i.test(ua);
+      if (inAppBrowser) {
+        statusEl.textContent = 'Estado: ⚠️ Estás en un navegador dentro de una app. Abre en Safari.';
+      }
+      if (!('mediaDevices' in navigator)) {
+        statusEl.textContent = 'Estado: ❌ Este navegador no expone mediaDevices/getUserMedia.';
+      }
+      if (!isSecureContext) {
+        statusEl.textContent = 'Estado: ❌ Se requiere HTTPS (contexto seguro).';
+      }
+    })();
+  </script>
 </body>
 </html>
-
