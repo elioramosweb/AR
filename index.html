@@ -3,16 +3,16 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>AR.js + p5.js — Hiro (iOS fix)</title>
+  <title>AR.js + p5.js — Hiro (iOS)</title>
 
-  <!-- A-Frame estable con AR.js 3.4.x -->
-  <script src="https://unpkg.com/aframe@1.4.1/dist/aframe.min.js"></script>
+  <!-- Versiones compatibles -->
+  <script src="https://unpkg.com/aframe@1.3.0/dist/aframe.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/ar.js@3.4.5/aframe/build/aframe-ar.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/p5@1.9.3/lib/p5.min.js"></script>
 
   <style>
     body { margin:0; overflow:hidden; font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif }
-    .hud{position:fixed;inset:0 auto auto 0;padding:.55rem .8rem;background:rgba(0,0,0,.55);color:#fff;z-index:10;font-size:.9rem}
+    .hud{position:fixed;left:0;right:0;top:0;padding:.6rem .8rem;background:rgba(0,0,0,.55);color:#fff;z-index:10;font-size:.9rem}
     .hud a{color:#9ad}
     .status{position:fixed;right:8px;bottom:8px;padding:.45rem .65rem;border-radius:.45rem;background:rgba(0,0,0,.55);color:#fff;z-index:10;font-size:.85rem}
     #startAR{position:fixed;left:8px;bottom:8px;padding:.5rem .8rem;border:0;border-radius:.5rem;background:#00c37a;color:#082;font-weight:700;z-index:10}
@@ -20,26 +20,22 @@
 </head>
 <body>
   <div class="hud">
-    Apunta al <a href="https://raw.githubusercontent.com/AR-js-org/AR.js/master/data/images/HIRO.jpg" target="_blank" rel="noopener">marcador Hiro</a>.
-    iPhone: abrir en <b>Safari</b>, usar <b>HTTPS</b> (ya lo tienes), y tocar <b>Iniciar AR</b>.
+    Abre esto en <b>Safari (iPhone)</b>, toca <b>Iniciar AR</b> y apunta al
+    <a href="https://raw.githubusercontent.com/AR-js-org/AR.js/master/data/images/HIRO.jpg" target="_blank" rel="noopener">marcador Hiro</a>.
   </div>
   <div class="status" id="status">Estado: esperando inicio…</div>
   <button id="startAR">Iniciar AR</button>
 
-  <a-scene
-    id="scene"
-    embedded
-    renderer="alpha: true; antialias: true"
-    vr-mode-ui="enabled: false"
-    arjs="sourceType: webcam; facingMode: environment; debugUIEnabled: false;">
+  <a-scene id="scene" embedded renderer="alpha:true;antialias:true"
+           vr-mode-ui="enabled:false"
+           arjs="sourceType: webcam; facingMode: environment; debugUIEnabled: false;">
     <a-marker id="marker" preset="hiro">
-      <!-- Cubo de control: si lo ves, el tracking está OK -->
-      <a-box position="0 0.5 0" depth="1" height="1" width="1" color="#00c37a" material="opacity:0.85"></a-box>
+      <!-- Cubo de verificación -->
+      <a-box position="0 0.5 0" depth="1" height="1" width="1"
+             color="#00c37a" material="opacity:0.85"></a-box>
 
-      <!-- Plano con textura de p5: un pelín levantado para evitar z-fighting -->
-      <a-plane id="p5plane"
-               position="0 0.01 0"
-               rotation="-90 0 0"
+      <!-- Plano con textura p5 -->
+      <a-plane id="p5plane" position="0 0.01 0" rotation="-90 0 0"
                width="1.5" height="1.5"
                material="shader: flat; side: double; transparent: true; src: #p5canvas"
                canvas-texture>
@@ -49,27 +45,16 @@
   </a-scene>
 
   <script>
-    // Asegura que el video de la cámara sea inline en iOS
-    (function ensureInlineVideo(){
-      const v = document.querySelector('video#arjs-video') || document.querySelector('video');
-      if (v){ v.setAttribute('playsinline',''); v.playsInline = true; v.muted = true; }
-      else setTimeout(ensureInlineVideo, 200);
-    })();
+    // Asegurar playsinline/muted en el <video> de AR.js (iOS)
+    const mo = new MutationObserver(() => {
+      document.querySelectorAll('video').forEach(v => {
+        v.setAttribute('playsinline',''); v.playsInline = true; v.muted = true;
+      });
+    });
+    mo.observe(document.documentElement, { childList: true, subtree: true });
 
     // Componente: refresca la textura de canvas cada frame
     AFRAME.registerComponent('canvas-texture', {
-      init(){
-        const el = this.el;
-        const attach = () => {
-          const cvs = document.getElementById('p5canvas');
-          if (cvs) {
-            el.setAttribute('material', 'shader: flat; src: #p5canvas; side: double; transparent: true; color: #fff');
-          } else {
-            setTimeout(attach, 100);
-          }
-        };
-        attach();
-      },
       tick(){
         const mesh = this.el.getObject3D('mesh');
         if (!mesh) return;
@@ -78,14 +63,14 @@
       }
     });
 
-    // Gesto de usuario para iOS (permiso de cámara)
+    // Gesto de usuario para permiso de cámara en iOS
     const startBtn = document.getElementById('startAR');
     const statusEl = document.getElementById('status');
     startBtn.addEventListener('click', async () => {
       try{
         const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: "environment" } }, audio:false });
         stream.getTracks().forEach(t => t.stop()); // AR.js abrirá su propio stream
-        statusEl.textContent = 'Estado: ✅ Permiso de cámara concedido. Apunta al marcador.';
+        statusEl.textContent = 'Estado: ✅ Permiso concedido. Apunta al marcador.';
       }catch(e){
         statusEl.textContent = 'Estado: ❌ ' + e.name + ' — ' + e.message;
       }
@@ -98,12 +83,11 @@
   </script>
 
   <script>
-    // === p5.js (canvas 2D como textura) ===
+    // === p5.js (canvas como textura) ===
     let cnv, t = 0;
     function setup(){
       cnv = createCanvas(512, 512);
       cnv.id('p5canvas');
-      cnv.elt.setAttribute('playsinline',''); // iOS
       pixelDensity(1);
       noStroke();
     }
@@ -130,7 +114,6 @@
       endShape(CLOSE);
       pop();
 
-      // Texto
       fill(255,240); textAlign(CENTER,CENTER); textSize(18);
       text('p5.js → textura AR', width/2, height-24);
 
@@ -139,3 +122,4 @@
   </script>
 </body>
 </html>
+
