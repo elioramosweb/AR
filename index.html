@@ -3,97 +3,139 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>p5.js + AR.js con marcador Hiro</title>
+  <title>AR.js + p5.js — Hiro (iOS fix)</title>
 
-  <!-- p5.js primero (creamos el canvas antes de que A-Frame/AR.js inicien) -->
+  <!-- A-Frame estable con AR.js 3.4.x -->
+  <script src="https://unpkg.com/aframe@1.4.1/dist/aframe.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/ar.js@3.4.5/aframe/build/aframe-ar.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/p5@1.9.3/lib/p5.min.js"></script>
 
-  <!-- A-Frame y AR.js para A-Frame -->
-  <script src="https://unpkg.com/aframe@1.5.0/dist/aframe.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/ar.js@3.4.5/aframe/build/aframe-ar.js"></script>
-
   <style>
-    body { margin: 0; overflow: hidden; font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; }
-    /* Ocultamos el canvas de p5 (igual sirve como textura) */
-    #p5canvas { position: fixed; left: -9999px; top: -9999px; }
-    .hud {
-      position: fixed; top: 0; left: 0; right: 0; z-index: 10;
-      background: rgba(0,0,0,.5); color: #fff; padding: 6px 10px; font-size: 14px;
-    }
+    body { margin:0; overflow:hidden; font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif }
+    .hud{position:fixed;inset:0 auto auto 0;padding:.55rem .8rem;background:rgba(0,0,0,.55);color:#fff;z-index:10;font-size:.9rem}
+    .hud a{color:#9ad}
+    .status{position:fixed;right:8px;bottom:8px;padding:.45rem .65rem;border-radius:.45rem;background:rgba(0,0,0,.55);color:#fff;z-index:10;font-size:.85rem}
+    #startAR{position:fixed;left:8px;bottom:8px;padding:.5rem .8rem;border:0;border-radius:.5rem;background:#00c37a;color:#082;font-weight:700;z-index:10}
   </style>
 </head>
 <body>
-  <div class="hud">Apunta al marcador Hiro. Si no ves nada: usa HTTPS y permite la cámara.</div>
+  <div class="hud">
+    Apunta al <a href="https://raw.githubusercontent.com/AR-js-org/AR.js/master/data/images/HIRO.jpg" target="_blank" rel="noopener">marcador Hiro</a>.
+    iPhone: abrir en <b>Safari</b>, usar <b>HTTPS</b> (ya lo tienes), y tocar <b>Iniciar AR</b>.
+  </div>
+  <div class="status" id="status">Estado: esperando inicio…</div>
+  <button id="startAR">Iniciar AR</button>
 
-  <!-- Animación p5.js dibujada en un canvas que usaremos como textura -->
-  <script>
-    new p5(p => {
-      let angle = 0;
-      let cnv;
-
-      p.setup = () => {
-        cnv = p.createCanvas(512, 512);   // 2D canvas
-        cnv.id('p5canvas');                // este id se usa en A-Frame como textura
-        p.pixelDensity(1);
-        p.noStroke();
-      };
-
-      p.draw = () => {
-        p.clear();                         // fondo transparente para ver la cámara detrás
-        p.translate(p.width/2, p.height/2);
-
-        angle += 0.03;
-        // Disco pulsante + órbitas simples
-        const base = 120 + 20 * Math.sin(angle * 2);
-        p.fill(255, 180, 0, 220);
-        p.ellipse(0, 0, base * 1.2, base * 1.2);
-
-        for (let i = 0; i < 6; i++) {
-          p.push();
-          p.rotate(angle + i * p.TWO_PI / 6);
-          const r = 150 + 25 * Math.sin(angle * 3 + i);
-          p.fill(255, 240 - i * 20, 80, 230);
-          p.ellipse(r, 0, 40, 40);
-          p.pop();
-        }
-      };
-    });
-  </script>
-
-  <!-- Pequeño componente para refrescar la textura del canvas en A-Frame cada frame -->
-  <script>
-    AFRAME.registerComponent('canvas-updater', {
-      tick: function () {
-        const mesh = this.el.getObject3D('mesh');
-        if (mesh && mesh.material && mesh.material.map) {
-          mesh.material.map.needsUpdate = true;
-        }
-      }
-    });
-  </script>
-
-  <!-- Escena AR: el plano usa el canvas de p5 (#p5canvas) como textura sobre el marcador Hiro -->
   <a-scene
-      embedded
-      vr-mode-ui="enabled: false"
-      renderer="alpha: true; antialias: true"
-      arjs="sourceType: webcam; debugUIEnabled: false; trackingMethod: best">
-    
-    <!-- Marcador Hiro -->
-    <a-marker preset="hiro">
-      <!-- Plano de 1x1 "acostado" sobre el marcador (rotación -90° en X) -->
-      <a-plane
-        position="0 0 0"
-        rotation="-90 0 0"
-        width="1" height="1"
-        material="shader: flat; src: #p5canvas; transparent: true; side: double;"
-        canvas-updater>
+    id="scene"
+    embedded
+    renderer="alpha: true; antialias: true"
+    vr-mode-ui="enabled: false"
+    arjs="sourceType: webcam; facingMode: environment; debugUIEnabled: false;">
+    <a-marker id="marker" preset="hiro">
+      <!-- Cubo de control: si lo ves, el tracking está OK -->
+      <a-box position="0 0.5 0" depth="1" height="1" width="1" color="#00c37a" material="opacity:0.85"></a-box>
+
+      <!-- Plano con textura de p5: un pelín levantado para evitar z-fighting -->
+      <a-plane id="p5plane"
+               position="0 0.01 0"
+               rotation="-90 0 0"
+               width="1.5" height="1.5"
+               material="shader: flat; side: double; transparent: true; src: #p5canvas"
+               canvas-texture>
       </a-plane>
     </a-marker>
-
-    <!-- Cámara AR por defecto -->
     <a-entity camera></a-entity>
   </a-scene>
+
+  <script>
+    // Asegura que el video de la cámara sea inline en iOS
+    (function ensureInlineVideo(){
+      const v = document.querySelector('video#arjs-video') || document.querySelector('video');
+      if (v){ v.setAttribute('playsinline',''); v.playsInline = true; v.muted = true; }
+      else setTimeout(ensureInlineVideo, 200);
+    })();
+
+    // Componente: refresca la textura de canvas cada frame
+    AFRAME.registerComponent('canvas-texture', {
+      init(){
+        const el = this.el;
+        const attach = () => {
+          const cvs = document.getElementById('p5canvas');
+          if (cvs) {
+            el.setAttribute('material', 'shader: flat; src: #p5canvas; side: double; transparent: true; color: #fff');
+          } else {
+            setTimeout(attach, 100);
+          }
+        };
+        attach();
+      },
+      tick(){
+        const mesh = this.el.getObject3D('mesh');
+        if (!mesh) return;
+        const mats = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+        mats.forEach(m => { if (m.map) m.map.needsUpdate = true; });
+      }
+    });
+
+    // Gesto de usuario para iOS (permiso de cámara)
+    const startBtn = document.getElementById('startAR');
+    const statusEl = document.getElementById('status');
+    startBtn.addEventListener('click', async () => {
+      try{
+        const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: "environment" } }, audio:false });
+        stream.getTracks().forEach(t => t.stop()); // AR.js abrirá su propio stream
+        statusEl.textContent = 'Estado: ✅ Permiso de cámara concedido. Apunta al marcador.';
+      }catch(e){
+        statusEl.textContent = 'Estado: ❌ ' + e.name + ' — ' + e.message;
+      }
+    });
+
+    // Mensajes de tracking
+    const marker = document.getElementById('marker');
+    marker.addEventListener('markerFound', () => statusEl.textContent = 'Estado: ✅ Marcador detectado.');
+    marker.addEventListener('markerLost',  () => statusEl.textContent = 'Estado: ⏳ Buscando marcador…');
+  </script>
+
+  <script>
+    // === p5.js (canvas 2D como textura) ===
+    let cnv, t = 0;
+    function setup(){
+      cnv = createCanvas(512, 512);
+      cnv.id('p5canvas');
+      cnv.elt.setAttribute('playsinline',''); // iOS
+      pixelDensity(1);
+      noStroke();
+    }
+    function draw(){
+      // Fondo animado
+      for (let y=0; y<height; y++){
+        const c = map(y,0,height,20,40) + 20 * Math.sin(t + y*0.01);
+        fill(10, c, 180); rect(0,y,width,1);
+      }
+      // Figura
+      push();
+      translate(width/2, height/2);
+      const R = 160 + 40*Math.sin(t*1.2);
+      const r = 90  + 30*Math.cos(t*1.6);
+      const pts = 180;
+      fill(255,255,255,220);
+      beginShape();
+      for (let i=0; i<pts; i++){
+        const a = TWO_PI*i/pts;
+        const x = (R + r*Math.cos(4*a + t)) * Math.cos(a);
+        const y = (R + r*Math.cos(4*a + t)) * Math.sin(a);
+        vertex(x,y);
+      }
+      endShape(CLOSE);
+      pop();
+
+      // Texto
+      fill(255,240); textAlign(CENTER,CENTER); textSize(18);
+      text('p5.js → textura AR', width/2, height-24);
+
+      t += 0.02;
+    }
+  </script>
 </body>
 </html>
-
